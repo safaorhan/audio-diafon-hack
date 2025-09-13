@@ -1,4 +1,4 @@
-# audio-diafon-hack
+# ESP32 ile Audio Zil Panelini Uzaktan Kontrol Edin
 
 Bu repository [ESP32 ile Zil Panelini Hackledim](https://www.youtube.com/watch?v=hRlOE7X7TNE) videosunda yaptığım projenin benzerini yapmak isteyenler için bir rehber niteliğindedir.
 
