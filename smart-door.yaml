@@ -1,0 +1,114 @@
+esphome:
+  name: smart-door
+  friendly_name: Smart Door
+  min_version: 2025.5.0
+  name_add_mac_suffix: false
+
+esp32:
+  board: esp32-c3-devkitm-1
+  framework:
+    type: arduino
+
+# Enable logging
+logger:
+
+# Enable Home Assistant API
+api:
+  encryption:
+    key: "REPLACE-WITH-YOUR-HA-API-KEY"
+    
+# Allow Over-The-Air updates
+ota:
+- platform: esphome
+
+wifi:
+  ssid: !secret wifi_ssid
+  password: !secret wifi_password
+  output_power: 17db
+  fast_connect: true
+  
+# --- OUTPUT SWITCHES ---
+switch:
+  - platform: gpio
+    pin: 6
+    inverted: true
+    name: "Door Button Trigger"
+    id: door_switch
+    restore_mode: ALWAYS_OFF
+    on_turn_on:
+      - delay: 300ms
+      - switch.turn_off: door_switch
+
+  - platform: template
+    name: "Comms Button Trigger"
+    id: comms_switch
+    turn_on_action:
+      - output.turn_on: comms_raw
+      - delay: 300ms
+      - output.turn_off: comms_raw
+  
+  - platform: template
+    name: "Mario Door"
+    id: mario_door
+    turn_on_action:
+      - script.execute: mario_intro
+
+# --- SPEAKER ACTIVITY (ADC) ---
+sensor:
+  - platform: adc
+    pin: 0
+    id: speaker_adc
+    update_interval: 50ms
+    attenuation: 11db 
+    filters:
+      - sliding_window_moving_average:
+          window_size: 10
+          send_every: 1
+    on_value:
+      then:
+        - if:
+            condition:
+              lambda: 'return x > 0.5;'
+            then:
+              - binary_sensor.template.publish:
+                  id: speaker_activity
+                  state: ON
+            else:
+              - binary_sensor.template.publish:
+                  id: speaker_activity
+                  state: OFF
+
+binary_sensor:
+  - platform: template
+    id: speaker_activity
+    name: "Speaker Activity"
+    device_class: sound
+
+output:
+  - platform: ledc
+    pin: 7         # PWM çıkışı vereceğin GPIO (seri 100k direncin diğer ucu mikrofon + hattına)
+    id: tone_out
+    frequency: 440Hz   # A4 notası, klasik test tonu
+  
+  - platform: gpio
+    pin: 5
+    inverted: true
+    id: comms_raw   # direct control of pin 5
+
+rtttl:
+  output: tone_out
+  id: rtttl_player
+  on_finished_playback: 
+    then:
+      - output.turn_off: comms_raw
+      - delay: 50ms
+      - switch.turn_on: door_switch
+      - switch.turn_off: mario_door 
+
+script:
+  - id: mario_intro
+    then:
+      - output.turn_on: comms_raw
+      - delay: 100ms
+      - rtttl.play:
+          rtttl: "mario:d=4,o=5,b=100:16e5,16e5,32p,8e5,16c5,8e5,8g5"
